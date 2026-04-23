@@ -1,4 +1,7 @@
-python-telegram-bot==20.7
+﻿python-telegram-bot==20.7
 psycopg2-binary
 python-dotenv
-google-generativeai
+google-genai
+apscheduler
+beautifulsoup4
+requests
