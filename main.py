@@ -595,3 +595,4 @@ if __name__ == "__main__":
 
     logger.info("🤖 Bot UTM corriendo...")
     app.run_polling()
+# v2
