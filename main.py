@@ -271,7 +271,7 @@ async def cmd_matricula(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"Matricula UTM\n\n{info}",
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("Ir al SGA", url="https://app.utm.edu.ec/sga")
+            InlineKeyboardButton("Ir al SGU", url="https://sgu.utm.edu.ec/auth/login")
         ]])
     )
 
@@ -332,7 +332,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(
             f"Matricula UTM\n\n{info}",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Ir al SGA", url="https://app.utm.edu.ec/sga")
+                InlineKeyboardButton("Ir al SGU", url="https://sgu.utm.edu.ec/auth/login")
             ]])
         )
 
@@ -466,7 +466,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"Matricula UTM\n\n{info}",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Ir al SGA", url="https://app.utm.edu.ec/sga")
+                InlineKeyboardButton("Ir al SGU", url="https://sgu.utm.edu.ec/auth/login")
             ]])
         )
         return
