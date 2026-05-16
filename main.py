@@ -94,27 +94,29 @@ def init_db():
         ),
         "matricula": (
             "Matricula UTM - SGU (S1-2026):\n"
-            "La UTM migro al nuevo Sistema de Gestion Universitaria (SGU).\n"
-            "Acceso: sgu.utm.edu.ec/auth/login\n\n"
+            "La UTM utiliza el Sistema de Gestion Universitaria (SGU). El antiguo SGA ya no esta en uso.\n"
+            "Acceso: https://sgu.utm.edu.ec/auth/login\n\n"
             "Pasos:\n"
             "1. Ingresa al SGU\n"
             "   - Ve a sgu.utm.edu.ec/auth/login\n"
-            "   - Usa las mismas credenciales del antiguo SGA\n"
-            "   - Escoge Rol (Aspirante)\n"
-            "   - Si eres nuevo: usuario = inicial nombre + apellido + ultimos 4 digitos cedula\n\n"
+            "   - Usuario: inicial nombre + apellido + ultimos 4 digitos cedula\n"
+            "     Ejemplo: Juan Perez 1234 -> jperez1234\n"
+            "   - Si olvidaste tu contrasena, usa 'Olvide mi contrasena' en el SGU\n"
+            "   - Escoge Rol: Aspirante (nuevos) o Estudiante (ya matriculados antes)\n\n"
             "2. Completa tus datos personales\n"
-            "   - Sube foto tipo carnet\n"
-            "   - Carga PDF de cedula (anverso y reverso)\n"
-            "   - Certificado de votacion\n\n"
-            "   - Titulo de  Bachiller(PDF)\n\n"
+            "   - Foto tipo carnet (fondo blanco)\n"
+            "   - PDF cedula (anverso y reverso en un solo archivo)\n"
+            "   - Certificado de votacion vigente\n"
+            "   - Titulo de Bachiller en PDF\n\n"
             "3. Selecciona la matricula\n"
-            "   - Ve a Pregrado o Matricula / Inscripcion a Semestre\n"
+            "   - Ve a: Pregrado > Matricula / Inscripcion a Semestre\n"
             "   - Elige carrera, modalidad y periodo S1-2026\n"
-            "   - Revisa tu horario de clases\n\n"
-            "4. Confirma y genera comprobante\n"
-            "   - Revisa toda la informacion\n"
-            "   - Guarda o imprime el comprobante\n\n"
-            "El proceso es 100% gratuito y en linea."
+            "   - Revisa y confirma tu horario de clases\n\n"
+            "4. Genera tu comprobante\n"
+            "   - Descarga o imprime el comprobante de matricula\n\n"
+            "El proceso es 100% gratuito y en linea.\n"
+            "Soporte: 0986616388 / 0969238552\n"
+            "Horario: 08:00-12:00 y 14:00-17:00"
         ),
         "carreras_web": (
             "Ingenieria Civil\n"
@@ -284,7 +286,7 @@ async def cmd_admisiones(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_matricula(update: Update, context: ContextTypes.DEFAULT_TYPE):
     info = obtener_info("matricula")
     await update.message.reply_text(
-        f"Matricula UTM\n\n{info}",
+        f"Matricula UTM - SGU\n\n{info}",
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("Ir al SGU", url="https://sgu.utm.edu.ec/auth/login")
         ]])
@@ -345,7 +347,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif dato == "matricula":
         info = obtener_info("matricula")
         await query.message.reply_text(
-            f"Matricula UTM\n\n{info}",
+            f"Matricula UTM - SGU\n\n{info}",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("Ir al SGU", url="https://sgu.utm.edu.ec/auth/login")
             ]])
@@ -480,7 +482,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Matricula
-    if any(p in texto_lower for p in ["matricula", "matrícula", "materias", "paralelo", "sgu", "sga"]):
+    if any(p in texto_lower for p in ["matricula", "matrícula", "materias", "paralelo", "sgu", "sga", "sistema de gestion", "como matricul"]):
         info = obtener_info("matricula")
         await update.message.reply_text(
             f"Matricula UTM\n\n{info}",
@@ -563,10 +565,13 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         prompt = (
             "Eres un asistente oficial de la Universidad Tecnica de Manabi (UTM). "
             "Respondes de forma clara, corta y precisa en espanol. "
+            "IMPORTANTE: La UTM ya NO usa el SGA (Sistema de Gestion Academica). "
+            "Ahora usa el SGU (Sistema de Gestion Universitaria) en sgu.utm.edu.ec. "
+            "Si alguien pregunta por el SGA, corrigelo y dirige al SGU. "
             "No inventes informacion. Si no sabes algo, sugiere visitar www.utm.edu.ec "
             "o contactar por WhatsApp al 0986616388.\n\n"
             f"Admisiones UTM:\n{admisiones}\n\n"
-            f"Matricula UTM:\n{matricula}\n\n"
+            f"Matricula UTM (SGU):\n{matricula}\n\n"
             f"Carreras UTM:\n{carreras}\n\n"
             f"Usuario: {texto}"
         )
@@ -614,5 +619,4 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, manejar_mensaje))
 
     logger.info("🤖 Bot UTM corriendo...")
-    app.run_polling()#   r e d e p l o y  
- 
+    app.run_polling()# redeploy
