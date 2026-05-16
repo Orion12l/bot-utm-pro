@@ -614,4 +614,5 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, manejar_mensaje))
 
     logger.info("🤖 Bot UTM corriendo...")
-    app.run_polling()
+    app.run_polling()#   r e d e p l o y  
+ 
