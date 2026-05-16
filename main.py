@@ -31,6 +31,9 @@ DATABASE_URL   = os.getenv("DATABASE_URL")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BOT_USERNAME   = os.getenv("BOT_USERNAME", "@utm_help_bot").lower()
 
+# IDs de administradores que pueden enviar enlaces
+ADMINS = [5504260343, 6501594656]
+
 for var_name, var_val in [("TELEGRAM_TOKEN", TELEGRAM_TOKEN),
                            ("DATABASE_URL",   DATABASE_URL),
                            ("GEMINI_API_KEY", GEMINI_API_KEY)]:
@@ -81,78 +84,87 @@ def init_db():
     info_base = {
         "admisiones": (
             "Admisiones UTM 2026:\n"
-            "• Inscripciones: 24 enero - 01 febrero\n"
-            "• Aceptacion de cupos: 03 - 06 de abril (desde las 10:00)\n"
-            "• Plataforma: postulacion.utm.edu.ec\n\n"
+            "Inscripciones: 24 enero - 01 febrero\n"
+            "Aceptacion de cupos: 03 - 06 de abril (desde las 10:00)\n"
+            "Plataforma: postulacion.utm.edu.ec\n\n"
             "WhatsApp UTM:\n"
-            "• 0969238552\n"
-            "• 0990181188\n"
+            "0999304713\n"
+            "0986616388\n"
             "Horario: 08:00-12:00 y 14:00-17:00"
         ),
         "matricula": (
-            "Matricula UTM:\n"
-            "1. Ingresa a app.utm.edu.ec/sga\n"
-            "2. Usa tu correo institucional y contrasena\n"
-            "3. Ve a Inscripciones o Solicitudes\n"
-            "4. Selecciona tu carrera y paralelos\n"
-            "5. Clic en Agregar para cada materia\n"
-            "6. Guarda los cambios\n"
-            "7. Descarga el certificado en PDF\n\n"
-            "Importante:\n"
-            "• Sigue el cronograma por ultimo digito de cedula\n"
-            "• Si no hay cupos, usa el boton solicitar\n"
-            "• El proceso es GRATUITO\n"
-            "• Para primer semestre: carga documentos en el SGA"
+            "Matricula UTM - SGU (S1-2026):\n"
+            "La UTM migro al nuevo Sistema de Gestion Universitaria (SGU).\n"
+            "Acceso: sgu.utm.edu.ec/auth/login\n\n"
+            "Pasos:\n"
+            "1. Ingresa al SGU\n"
+            "   - Ve a sgu.utm.edu.ec/auth/login\n"
+            "   - Usa las mismas credenciales del antiguo SGA\n"
+            "   - Escoge Rol (Aspirante)\n"
+            "   - Si eres nuevo: usuario = inicial nombre + apellido + ultimos 4 digitos cedula\n\n"
+            "2. Completa tus datos personales\n"
+            "   - Sube foto tipo carnet\n"
+            "   - Carga PDF de cedula (anverso y reverso)\n"
+            "   - Certificado de votacion\n\n"
+            "   - Titulo de  Bachiller(PDF)\n\n"
+            "3. Selecciona la matricula\n"
+            "   - Ve a Pregrado o Matricula / Inscripcion a Semestre\n"
+            "   - Elige carrera, modalidad y periodo S1-2026\n"
+            "   - Revisa tu horario de clases\n\n"
+            "4. Confirma y genera comprobante\n"
+            "   - Revisa toda la informacion\n"
+            "   - Guarda o imprime el comprobante\n\n"
+            "El proceso es 100% gratuito y en linea."
         ),
         "carreras_web": (
-            "• Ingenieria Civil\n"
-            "• Ingenieria Industrial\n"
-            "• Ingenieria Quimica\n"
-            "• Electronica y Automatizacion\n"
-            "• Electricidad\n"
-            "• Biotecnologia\n"
-            "• Geologia\n"
-            "• Mecatronica\n"
-            "• Biologia\n"
-            "• Quimica\n"
-            "• Fisica\n"
-            "• Medicina\n"
-            "• Enfermeria\n"
-            "• Odontologia\n"
-            "• Nutricion y Dietetica\n"
-            "• Bioquimica y Farmacia\n"
-            "• Medicina Veterinaria\n"
-            "• Agroindustria\n"
-            "• Agronegocios (Modalidad Hibrida)\n"
-            "• Biodiversidad y Recursos Geneticos\n"
-            "• Sistemas de Informacion\n"
-            "• Tecnologias de la Informacion\n"
-            "• Tecnologias de la Informacion (En Linea)\n"
-            "• Realidad Virtual y Videojuegos (Hibrida)\n"
-            "• Economia (Hibrida)\n"
-            "• Economia (En Linea)\n"
-            "• Contabilidad y Auditoria (Hibrida)\n"
-            "• Administracion de Empresas (Hibrida)\n"
-            "• Administracion de Empresas (En Linea)\n"
-            "• Turismo (Hibrida)\n"
-            "• Turismo (En Linea)\n"
-            "• Negocios Digitales (En Linea)\n"
-            "• Logistica y Transporte\n"
-            "• Gastronomia\n"
-            "• Educacion Basica (En Linea)\n"
-            "• Educacion Inicial (En Linea)\n"
-            "• Pedagogia de los Idiomas Nacionales y Extranjeros\n"
-            "• Pedagogia de las Ciencias Experimentales (Quimica y Biologia)\n"
-            "• Pedagogia de las Ciencias Experimentales (Matematicas y Fisica)\n"
-            "• Pedagogia de Actividad Fisica y Deporte\n"
-            "• Pedagogia de la Lengua y Literatura\n"
-            "• Entrenamiento Deportivo\n"
-            "• Psicologia (En Linea)\n"
-            "• Trabajo Social\n"
-            "• Derecho (Hibrida)\n"
-            "• Derecho (En Linea)\n"
-            "• Sociologia (Hibrida)\n"
-            "• Tecnologias Geoespaciales"
+            "Ingenieria Civil\n"
+            "Ingenieria Industrial\n"
+            "Ingenieria Quimica\n"
+            "Electronica y Automatizacion\n"
+            "Electricidad\n"
+            "Biotecnologia\n"
+            "Geologia\n"
+            "Mecatronica\n"
+            "Biologia\n"
+            "Quimica\n"
+            "Fisica\n"
+            "Medicina\n"
+            "Enfermeria\n"
+            "Odontologia\n"
+            "Nutricion y Dietetica\n"
+            "Bioquimica y Farmacia\n"
+            "Medicina Veterinaria\n"
+            "Agroindustria\n"
+            "Agronegocios (Modalidad Hibrida)\n"
+            "Biodiversidad y Recursos Geneticos\n"
+            "Sistemas de Informacion\n"
+            "Tecnologias de la Informacion\n"
+            "Tecnologias de la Informacion (En Linea)\n"
+            "Realidad Virtual y Videojuegos (Hibrida)\n"
+            "Economia (Hibrida)\n"
+            "Economia (En Linea)\n"
+            "Contabilidad y Auditoria (Hibrida)\n"
+            "Administracion de Empresas (Hibrida)\n"
+            "Administracion de Empresas (En Linea)\n"
+            "Turismo (Hibrida)\n"
+            "Turismo (En Linea)\n"
+            "Negocios Digitales (En Linea)\n"
+            "Logistica y Transporte\n"
+            "Gastronomia\n"
+            "Educacion Basica (En Linea)\n"
+            "Educacion Inicial (En Linea)\n"
+            "Pedagogia de los Idiomas Nacionales y Extranjeros\n"
+            "Pedagogia de las Ciencias Experimentales (Quimica y Biologia)\n"
+            "Pedagogia de las Ciencias Experimentales (Matematicas y Fisica)\n"
+            "Pedagogia de Actividad Fisica y Deporte\n"
+            "Pedagogia de la Lengua y Literatura\n"
+            "Entrenamiento Deportivo\n"
+            "Psicologia (En Linea)\n"
+            "Trabajo Social\n"
+            "Derecho (Hibrida)\n"
+            "Derecho (En Linea)\n"
+            "Sociologia (Hibrida)\n"
+            "Tecnologias Geoespaciales"
         ),
     }
     for clave, valor in info_base.items():
@@ -252,10 +264,13 @@ async def cmd_ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/matricula - Como matricularse\n"
         "/carreras - Lista de carreras\n"
         "/contacto - Datos de contacto\n"
-        "/horarios - Horarios de atencion\n\n"
+        "/horarios - Horarios de atencion\n"
         "Tambien puedes escribir tu pregunta directamente.",
         reply_markup=menu_principal()
     )
+
+async def cmd_miid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(f"Tu ID de Telegram es: {update.effective_user.id}")
 
 async def cmd_admisiones(update: Update, context: ContextTypes.DEFAULT_TYPE):
     info = obtener_info("admisiones")
@@ -292,7 +307,7 @@ async def cmd_contacto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Direccion: Av. Urbina y Che Guevara, Portoviejo, Manabi\n\n"
         "WhatsApp:\n"
         "0969238552\n"
-        "0990181188\n"
+        "0986616388\n"
         "Horario: 08:00-12:00 y 14:00-17:00\n\n"
         "Redes sociales:\n"
         "Twitter: @UTMManabi\n"
@@ -380,7 +395,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Portoviejo, Manabi\n\n"
             "WhatsApp:\n"
             "0969238552\n"
-            "0990181188\n"
+            "0986616388\n"
             "Horario: 08:00-12:00 y 14:00-17:00",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("Visitar utm.edu.ec", url="https://www.utm.edu.ec")
@@ -419,29 +434,33 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Detectar enlaces en grupos
     if es_grupo and re.search(r"http[s]?://", texto):
-        adv = advertir_usuario(user.id)
-        try:
-            await update.message.delete()
-        except Exception:
-            pass
-        if adv >= 2:
+        # Admins pueden enviar enlaces
+        if user.id in ADMINS:
+            pass  # permitir y continuar
+        else:
+            adv = advertir_usuario(user.id)
             try:
-                await context.bot.ban_chat_member(
-                    chat_id=update.effective_chat.id,
-                    user_id=user.id
-                )
+                await update.message.delete()
+            except Exception:
+                pass
+            if adv >= 2:
+                try:
+                    await context.bot.ban_chat_member(
+                        chat_id=update.effective_chat.id,
+                        user_id=user.id
+                    )
+                    await context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=f"{user.first_name} fue baneado por enviar enlaces."
+                    )
+                except Exception as e:
+                    logger.error(f"No se pudo banear: {e}")
+            else:
                 await context.bot.send_message(
                     chat_id=update.effective_chat.id,
-                    text=f"{user.first_name} fue baneado por enviar enlaces."
+                    text=f"Advertencia {adv}/2 para {user.first_name}: No se permiten enlaces."
                 )
-            except Exception as e:
-                logger.error(f"No se pudo banear: {e}")
-        else:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"Advertencia {adv}/2 para {user.first_name}: No se permiten enlaces."
-            )
-        return
+            return
 
     # En grupos solo responder si mencionan al bot
     if es_grupo and BOT_USERNAME not in texto.lower():
@@ -461,7 +480,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Matricula
-    if any(p in texto_lower for p in ["matricula", "matrícula", "materias", "paralelo", "sga"]):
+    if any(p in texto_lower for p in ["matricula", "matrícula", "materias", "paralelo", "sgu", "sga"]):
         info = obtener_info("matricula")
         await update.message.reply_text(
             f"Matricula UTM\n\n{info}",
@@ -488,7 +507,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Contacto UTM\n\n"
             "WhatsApp:\n"
             "0969238552\n"
-            "0990181188\n"
+            "0986616388\n"
             "Horario: 08:00-12:00 y 14:00-17:00\n\n"
             "Email: info@utm.edu.ec",
             reply_markup=InlineKeyboardMarkup([[
@@ -542,10 +561,10 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         carreras   = obtener_info("carreras_web") or ""
 
         prompt = (
-            "Eres un asistente oficial de la Universidad Tecnica de Manabi (UTM)"
+            "Eres un asistente oficial de la Universidad Tecnica de Manabi (UTM). "
             "Respondes de forma clara, corta y precisa en espanol. "
             "No inventes informacion. Si no sabes algo, sugiere visitar www.utm.edu.ec "
-            "o contactar por WhatsApp al 0969238552.\n\n"
+            "o contactar por WhatsApp al 0986616388.\n\n"
             f"Admisiones UTM:\n{admisiones}\n\n"
             f"Matricula UTM:\n{matricula}\n\n"
             f"Carreras UTM:\n{carreras}\n\n"
@@ -566,7 +585,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error Gemini: {e}")
         await update.message.reply_text(
             "No pude procesar tu pregunta.\n"
-            "Visita utm.edu.ec o contactanos por WhatsApp al 0969238552.",
+            "Visita utm.edu.ec o contactanos por WhatsApp al 0986616388.",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("utm.edu.ec", url="https://www.utm.edu.ec")
             ]])
@@ -583,6 +602,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("start",      cmd_start))
     app.add_handler(CommandHandler("ayuda",      cmd_ayuda))
     app.add_handler(CommandHandler("help",       cmd_ayuda))
+    app.add_handler(CommandHandler("miid",       cmd_miid))
     app.add_handler(CommandHandler("admisiones", cmd_admisiones))
     app.add_handler(CommandHandler("matricula",  cmd_matricula))
     app.add_handler(CommandHandler("carreras",   cmd_carreras))
@@ -595,4 +615,3 @@ if __name__ == "__main__":
 
     logger.info("🤖 Bot UTM corriendo...")
     app.run_polling()
-# v2
