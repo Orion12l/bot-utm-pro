@@ -14,9 +14,6 @@ from telegram.ext import (
 )
 from google import genai
 
-# ─────────────────────────────────────────────
-# Configuración inicial
-# ─────────────────────────────────────────────
 load_dotenv()
 os.environ.pop("GOOGLE_API_KEY", None)
 
@@ -31,7 +28,6 @@ DATABASE_URL   = os.getenv("DATABASE_URL")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BOT_USERNAME   = os.getenv("BOT_USERNAME", "@utm_help_bot").lower()
 
-# IDs de administradores que pueden enviar enlaces
 ADMINS = [5504260343, 6501594656]
 
 for var_name, var_val in [("TELEGRAM_TOKEN", TELEGRAM_TOKEN),
@@ -40,14 +36,8 @@ for var_name, var_val in [("TELEGRAM_TOKEN", TELEGRAM_TOKEN),
     if not var_val:
         raise EnvironmentError(f"Falta la variable de entorno: {var_name}")
 
-# ─────────────────────────────────────────────
-# Cliente Gemini
-# ─────────────────────────────────────────────
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# ─────────────────────────────────────────────
-# Conexión PostgreSQL con reconexión automática
-# ─────────────────────────────────────────────
 _conn = None
 
 def get_conn():
@@ -99,8 +89,10 @@ def init_db():
             "Pasos:\n"
             "1. Ingresa al SGU\n"
             "   - Ve a sgu.utm.edu.ec/auth/login\n"
-            "   - Usuario:inicial-primer nombre + primer apellido + ultimos 4 digitos cedula\n"
-            "     Ejemplo:Juan Perez 1234 -> jperez1234@utm.edu.ec + contraseña # de cedula\n"
+            "   - Usuario: inicial del primer nombre + primer apellido completo + ultimos 4 digitos de cedula\n"
+            "     Ejemplo: Juan Perez 1234567890 -> jperez7890\n"
+            "   - Correo institucional: jperez7890@utm.edu.ec\n"
+            "   - Contrasena: numero de cedula completo\n"
             "   - Si olvidaste tu contrasena, usa 'Olvide mi contrasena' en el SGU\n"
             "   - Escoge Rol: Aspirante (nuevos) o Estudiante (ya matriculados antes)\n\n"
             "2. Completa tus datos personales\n"
@@ -217,9 +209,6 @@ def obtener_info(clave):
         logger.error(f"Error al obtener info: {e}")
         return None
 
-# ─────────────────────────────────────────────
-# Menú principal
-# ─────────────────────────────────────────────
 def menu_principal():
     teclado = [
         [
@@ -241,9 +230,6 @@ def menu_principal():
     ]
     return InlineKeyboardMarkup(teclado)
 
-# ─────────────────────────────────────────────
-# Comandos
-# ─────────────────────────────────────────────
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     guardar_usuario(update.effective_user)
     await update.message.reply_text(
@@ -327,9 +313,6 @@ async def cmd_horarios(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Lunes a viernes 08h00 - 17h00"
     )
 
-# ─────────────────────────────────────────────
-# Botones interactivos
-# ─────────────────────────────────────────────
 async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -343,7 +326,6 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("Postulacion UTM", url="https://postulacion.utm.edu.ec")
             ]])
         )
-
     elif dato == "matricula":
         info = obtener_info("matricula")
         await query.message.reply_text(
@@ -352,7 +334,6 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("Ir al SGU", url="https://sgu.utm.edu.ec/auth/login")
             ]])
         )
-
     elif dato == "carreras":
         carreras = obtener_info("carreras_web")
         await query.message.reply_text(
@@ -361,7 +342,6 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("Ver facultades", url="https://www.utm.edu.ec/oferta-academica/grado/facultades")
             ]])
         )
-
     elif dato == "costo":
         await query.message.reply_text(
             "Costos UTM\n\n"
@@ -371,14 +351,12 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("Ver utm.edu.ec", url="https://www.utm.edu.ec")
             ]])
         )
-
     elif dato == "horario":
         await query.message.reply_text(
             "Horarios UTM\n\n"
             "Lunes a viernes 08h00 - 17h00\n"
             "Telefono: (593 5) 263-2677"
         )
-
     elif dato == "ubicacion":
         await query.message.reply_text(
             "Ubicacion UTM\n\n"
@@ -388,7 +366,6 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("Ver en Google Maps", url="https://maps.google.com/?q=Universidad+Tecnica+de+Manabi+Portoviejo")
             ]])
         )
-
     elif dato == "contacto":
         await query.message.reply_text(
             "Contacto UTM\n\n"
@@ -404,9 +381,6 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]])
         )
 
-# ─────────────────────────────────────────────
-# Bienvenida
-# ─────────────────────────────────────────────
 async def bienvenida(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.new_chat_members:
         for user in update.message.new_chat_members:
@@ -421,9 +395,6 @@ async def bienvenida(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Respeto mutuo"
             )
 
-# ─────────────────────────────────────────────
-# Manejador de mensajes
-# ─────────────────────────────────────────────
 async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -434,11 +405,9 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     guardar_usuario(user)
 
-    # Detectar enlaces en grupos
     if es_grupo and re.search(r"http[s]?://", texto):
-        # Admins pueden enviar enlaces
         if user.id in ADMINS:
-            pass  # permitir y continuar
+            pass
         else:
             adv = advertir_usuario(user.id)
             try:
@@ -464,13 +433,11 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             return
 
-    # En grupos solo responder si mencionan al bot
     if es_grupo and BOT_USERNAME not in texto.lower():
         return
 
     texto_lower = texto.lower()
 
-    # Admisiones
     if any(p in texto_lower for p in ["admis", "inscripci", "ingreso", "postula"]):
         info = obtener_info("admisiones")
         await update.message.reply_text(
@@ -481,7 +448,6 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Matricula
     if any(p in texto_lower for p in ["matricula", "matrícula", "materias", "paralelo", "sgu", "sga", "sistema de gestion", "como matricul"]):
         info = obtener_info("matricula")
         await update.message.reply_text(
@@ -492,7 +458,6 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Carreras
     if any(p in texto_lower for p in ["carrera", "facultad", "oferta"]):
         carreras = obtener_info("carreras_web")
         await update.message.reply_text(
@@ -503,7 +468,6 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Contacto
     if any(p in texto_lower for p in ["contacto", "whatsapp", "telefono", "teléfono"]):
         await update.message.reply_text(
             "Contacto UTM\n\n"
@@ -518,7 +482,6 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Horarios
     if any(p in texto_lower for p in ["horario", "atencion", "atención"]):
         await update.message.reply_text(
             "Horarios UTM\n\n"
@@ -527,7 +490,6 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Costos
     if any(p in texto_lower for p in ["costo", "precio", "gratis", "gratuito", "pagar"]):
         await update.message.reply_text(
             "Costos UTM\n\n"
@@ -536,7 +498,6 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Ubicacion
     if any(p in texto_lower for p in ["ubicacion", "ubicación", "donde", "dónde", "direccion"]):
         await update.message.reply_text(
             "Ubicacion UTM\n\n"
@@ -548,7 +509,6 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Menu
     if any(p in texto_lower for p in ["menu", "menú", "opciones", "ayuda", "help"]):
         await update.message.reply_text(
             "Elige una opcion:",
@@ -556,7 +516,6 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Gemini AI
     try:
         admisiones = obtener_info("admisiones") or ""
         matricula  = obtener_info("matricula")  or ""
@@ -596,9 +555,6 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]])
         )
 
-# ─────────────────────────────────────────────
-# Arranque
-# ─────────────────────────────────────────────
 if __name__ == "__main__":
     init_db()
 
@@ -619,4 +575,4 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, manejar_mensaje))
 
     logger.info("🤖 Bot UTM corriendo...")
-    app.run_polling()# redeploy
+    app.run_polling()
