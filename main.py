@@ -107,7 +107,7 @@ def init_db():
             "4. Genera tu comprobante\n"
             "   - Descarga o imprime el comprobante de matricula\n\n"
             "El proceso es 100% gratuito y en linea.\n"
-            "Soporte: 0986616388 / 0969238552\n"
+            "Soporte: 0986616388 / 0999304713\n"
             "Horario: 08:00-12:00 y 14:00-17:00"
         ),
         "carreras_web": (
@@ -294,8 +294,8 @@ async def cmd_contacto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Email: info@utm.edu.ec\n"
         "Direccion: Av. Urbina y Che Guevara, Portoviejo, Manabi\n\n"
         "WhatsApp:\n"
-        "0969238552\n"
         "0986616388\n"
+        "0999304713\n"
         "Horario: 08:00-12:00 y 14:00-17:00\n\n"
         "Redes sociales:\n"
         "Twitter: @UTMManabi\n"
@@ -373,8 +373,8 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Email: info@utm.edu.ec\n"
             "Portoviejo, Manabi\n\n"
             "WhatsApp:\n"
-            "0969238552\n"
             "0986616388\n"
+            "0999304713\n"
             "Horario: 08:00-12:00 y 14:00-17:00",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("Visitar utm.edu.ec", url="https://www.utm.edu.ec")
@@ -472,8 +472,8 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "Contacto UTM\n\n"
             "WhatsApp:\n"
-            "0969238552\n"
             "0986616388\n"
+            "0999304713\n"
             "Horario: 08:00-12:00 y 14:00-17:00\n\n"
             "Email: info@utm.edu.ec",
             reply_markup=InlineKeyboardMarkup([[
