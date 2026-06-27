@@ -1,44 +1,77 @@
-﻿import psycopg2, os
+import os
+import psycopg
 from dotenv import load_dotenv
+
 load_dotenv()
-conn = psycopg2.connect(os.getenv('DATABASE_URL'))
-cursor = conn.cursor()
-cursor.execute("CREATE TABLE IF NOT EXISTS info_utm (clave TEXT PRIMARY KEY, valor TEXT, actualizado TIMESTAMP DEFAULT NOW())")
-carreras = """Ingenieria Industrial
+
+carreras = """Ingenieria Civil
+Ingenieria Industrial
+Ingenieria Quimica
 Electronica y Automatizacion
+Electricidad
+Biotecnologia
+Geologia
+Mecatronica
+Biologia
+Quimica
+Fisica
+Medicina
+Enfermeria
+Odontologia
 Nutricion y Dietetica
 Bioquimica y Farmacia
+Medicina Veterinaria
+Agroindustria
 Agronegocios (Modalidad Hibrida)
 Biodiversidad y Recursos Geneticos
-Administracion de Empresas (Modalidad Hibrida)
-Administracion de Empresas (Modalidad En Linea)
-Contabilidad y Auditoria (Modalidad Hibrida)
-Economia (Modalidad Hibrida)
-Economia (Modalidad En Linea)
-Turismo (Modalidad Hibrida)
-Turismo (Modalidad En Linea)
-Negocios Digitales (Modalidad En Linea)
-Educacion Basica (Modalidad En Linea)
-Educacion Inicial (Modalidad En Linea)
+Sistemas de Informacion
+Tecnologias de la Informacion
+Tecnologias de la Informacion (En Linea)
+Realidad Virtual y Videojuegos (Hibrida)
+Economia (Hibrida)
+Economia (En Linea)
+Contabilidad y Auditoria (Hibrida)
+Administracion de Empresas (Hibrida)
+Administracion de Empresas (En Linea)
+Turismo (Hibrida)
+Turismo (En Linea)
+Negocios Digitales (En Linea)
+Logistica y Transporte
+Gastronomia
+Educacion Basica (En Linea)
+Educacion Inicial (En Linea)
 Pedagogia de los Idiomas Nacionales y Extranjeros
-Pedagogia de las Ciencias Experimentales Quimica y Biologia
-Pedagogia de las Ciencias Experimentales Matematicas y Fisica
+Pedagogia de las Ciencias Experimentales (Quimica y Biologia)
+Pedagogia de las Ciencias Experimentales (Matematicas y Fisica)
 Pedagogia de Actividad Fisica y Deporte
 Pedagogia de la Lengua y Literatura
 Entrenamiento Deportivo
-Sistemas de Informacion
-Tecnologias de la Informacion
-Tecnologias de la Informacion (Modalidad En Linea)
-Realidad Virtual y Videojuegos (Modalidad Hibrida)
-Ingenieria Civil
-Ingenieria Quimica
-Medicina Veterinaria
-Agroindustria
-Medicina
-Enfermeria
-Odontologia"""
-valor = "\n".join([f"• {c}" for c in carreras.strip().split("\n")])
-cursor.execute("INSERT INTO info_utm (clave, valor, actualizado) VALUES ('carreras_web', %s, NOW()) ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, actualizado = NOW()", (valor,))
-conn.commit()
+Psicologia (En Linea)
+Trabajo Social
+Derecho (Hibrida)
+Derecho (En Linea)
+Sociologia (Hibrida)
+Tecnologias Geoespaciales"""
+
+with psycopg.connect(os.getenv("DATABASE_URL")) as conn:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS info_utm (
+            clave TEXT PRIMARY KEY,
+            valor TEXT,
+            actualizado TIMESTAMP DEFAULT NOW()
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO info_utm (clave, valor, actualizado)
+        VALUES ('carreras_web', %s, NOW())
+        ON CONFLICT (clave) DO UPDATE
+        SET valor = EXCLUDED.valor, actualizado = NOW()
+        """,
+        (carreras,),
+    )
+    conn.commit()
+
 print("Listo")
-conn.close()

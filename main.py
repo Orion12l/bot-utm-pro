@@ -1,5 +1,6 @@
 import os
 import re
+import asyncio
 import logging
 import psycopg
 from dotenv import load_dotenv
@@ -28,7 +29,124 @@ DATABASE_URL   = os.getenv("DATABASE_URL")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BOT_USERNAME   = os.getenv("BOT_USERNAME", "@utm_help_bot").lower()
 
-ADMINS = [5504260343, 6501594656]
+def _parse_admins():
+    raw = os.getenv("ADMIN_IDS", "5504260343,6501594656")
+    return [int(x.strip()) for x in raw.split(",") if x.strip()]
+
+ADMINS = _parse_admins()
+
+CONTACTO_WHATSAPP = (
+    "0986616388\n"
+    "0999304713\n"
+    "0969238552\n"
+    "0990181188"
+)
+HORARIO_ATENCION = "08:00-12:00 y 14:00-18:00"
+
+INFO_ADMISIONES = (
+    "Admisiones UTM 2026:\n"
+    "- Inscripciones: 24 enero - 01 febrero\n"
+    "- Aceptacion de cupos: 03 al 06 de abril (desde las 10:00)\n"
+    "- Plataforma: postulacion.utm.edu.ec\n\n"
+    "WhatsApp UTM:\n"
+    "- 0986616388\n"
+    "- 0999304713\n"
+    "- 0969238552\n"
+    "- 0990181188\n"
+    f"Horario: {HORARIO_ATENCION}"
+)
+
+INFO_MATRICULA = (
+    "Matricula UTM - SGU (S1-2026):\n"
+    "La UTM utiliza el Sistema de Gestion Universitaria (SGU). El antiguo SGA ya no esta en uso.\n"
+    "Acceso: https://sgu.utm.edu.ec/auth/login\n\n"
+    "Pasos:\n"
+    "1. Ingresa al SGU\n"
+    "   - Ve a sgu.utm.edu.ec/auth/login\n"
+    "   - Usuario: inicial del primer nombre + primer apellido completo + ultimos 4 digitos de cedula\n"
+    "     Ejemplo: Juan Perez 1234567890 -> jperez7890\n"
+    "   - Correo institucional: jperez7890@utm.edu.ec\n"
+    "   - Contrasena: numero de cedula completo\n"
+    "   - Si olvidaste tu contrasena, usa 'Olvide mi contrasena' en el SGU\n"
+    "   - Escoge Rol: Aspirante (nuevos) o Estudiante (ya matriculados antes)\n\n"
+    "2. Completa tus datos personales\n"
+    "   - Foto tipo carnet (fondo blanco)\n"
+    "   - PDF cedula (anverso y reverso en un solo archivo)\n"
+    "   - Certificado de votacion vigente\n"
+    "   - Titulo de Bachiller en PDF\n\n"
+    "3. Selecciona la matricula\n"
+    "   - Ve a: Pregrado > Matricula / Inscripcion a Semestre\n"
+    "   - Elige carrera, modalidad y periodo S1-2026\n"
+    "   - Revisa y confirma tu horario de clases\n\n"
+    "4. Genera tu comprobante\n"
+    "   - Descarga o imprime el comprobante de matricula\n\n"
+    "El proceso es 100% gratuito y en linea.\n"
+    f"Soporte WhatsApp: {CONTACTO_WHATSAPP.replace(chr(10), ' / ')}\n"
+    f"Horario: {HORARIO_ATENCION}"
+)
+
+INFO_CARRERAS = (
+    "Ingenieria Civil\n"
+    "Ingenieria Industrial\n"
+    "Ingenieria Quimica\n"
+    "Electronica y Automatizacion\n"
+    "Electricidad\n"
+    "Biotecnologia\n"
+    "Geologia\n"
+    "Mecatronica\n"
+    "Biologia\n"
+    "Quimica\n"
+    "Fisica\n"
+    "Medicina\n"
+    "Enfermeria\n"
+    "Odontologia\n"
+    "Nutricion y Dietetica\n"
+    "Bioquimica y Farmacia\n"
+    "Medicina Veterinaria\n"
+    "Agroindustria\n"
+    "Agronegocios (Modalidad Hibrida)\n"
+    "Biodiversidad y Recursos Geneticos\n"
+    "Sistemas de Informacion\n"
+    "Tecnologias de la Informacion\n"
+    "Tecnologias de la Informacion (En Linea)\n"
+    "Realidad Virtual y Videojuegos (Hibrida)\n"
+    "Economia (Hibrida)\n"
+    "Economia (En Linea)\n"
+    "Contabilidad y Auditoria (Hibrida)\n"
+    "Administracion de Empresas (Hibrida)\n"
+    "Administracion de Empresas (En Linea)\n"
+    "Turismo (Hibrida)\n"
+    "Turismo (En Linea)\n"
+    "Negocios Digitales (En Linea)\n"
+    "Logistica y Transporte\n"
+    "Gastronomia\n"
+    "Educacion Basica (En Linea)\n"
+    "Educacion Inicial (En Linea)\n"
+    "Pedagogia de los Idiomas Nacionales y Extranjeros\n"
+    "Pedagogia de las Ciencias Experimentales (Quimica y Biologia)\n"
+    "Pedagogia de las Ciencias Experimentales (Matematicas y Fisica)\n"
+    "Pedagogia de Actividad Fisica y Deporte\n"
+    "Pedagogia de la Lengua y Literatura\n"
+    "Entrenamiento Deportivo\n"
+    "Psicologia (En Linea)\n"
+    "Trabajo Social\n"
+    "Derecho (Hibrida)\n"
+    "Derecho (En Linea)\n"
+    "Sociologia (Hibrida)\n"
+    "Tecnologias Geoespaciales"
+)
+
+INFO_BASE = {
+    "admisiones": INFO_ADMISIONES,
+    "matricula": INFO_MATRICULA,
+    "carreras_web": INFO_CARRERAS,
+}
+
+SECCIONES_DB = {
+    "admision": ("Admisiones UTM", "admisiones", [("Postulacion UTM", "https://postulacion.utm.edu.ec")]),
+    "matricula": ("Matricula UTM - SGU", "matricula", [("Ir al SGU", "https://sgu.utm.edu.ec/auth/login")]),
+    "carreras": ("Carreras UTM", "carreras_web", [("Ver facultades", "https://www.utm.edu.ec/oferta-academica/grado/facultades")]),
+}
 
 for var_name, var_val in [("TELEGRAM_TOKEN", TELEGRAM_TOKEN),
                            ("DATABASE_URL",   DATABASE_URL),
@@ -44,12 +162,12 @@ def get_conn():
     global _conn
     try:
         if _conn is None or _conn.closed:
-            raise Exception("Conexión cerrada")
+            raise Exception("Conexion cerrada")
         _conn.execute("SELECT 1")
     except Exception:
         logger.warning("Reconectando a PostgreSQL...")
         _conn = psycopg.connect(DATABASE_URL)
-        logger.info("✅ Reconexión exitosa")
+        logger.info("Reconexion exitosa")
     return _conn
 
 def init_db():
@@ -71,105 +189,14 @@ def init_db():
     """)
     conn.commit()
 
-    info_base = {
-        "admisiones": (
-            "Admisiones UTM 2026:\n"
-            "Inscripciones: 24 enero - 01 febrero\n"
-            "Aceptacion de cupos: 03 - 06 de abril (desde las 10:00)\n"
-            "Plataforma: postulacion.utm.edu.ec\n\n"
-            "WhatsApp UTM:\n"
-            "0999304713\n"
-            "0986616388\n"
-            "Horario: 08:00-12:00 y 14:00-17:00"
-        ),
-        "matricula": (
-            "Matricula UTM - SGU (S1-2026):\n"
-            "La UTM utiliza el Sistema de Gestion Universitaria (SGU). El antiguo SGA ya no esta en uso.\n"
-            "Acceso: https://sgu.utm.edu.ec/auth/login\n\n"
-            "Pasos:\n"
-            "1. Ingresa al SGU\n"
-            "   - Ve a sgu.utm.edu.ec/auth/login\n"
-            "   - Usuario: inicial del primer nombre + primer apellido completo + ultimos 4 digitos de cedula\n"
-            "     Ejemplo: Juan Perez 1234567890 -> jperez7890\n"
-            "   - Correo institucional: jperez7890@utm.edu.ec\n"
-            "   - Contrasena: numero de cedula completo\n"
-            "   - Si olvidaste tu contrasena, usa 'Olvide mi contrasena' en el SGU\n"
-            "   - Escoge Rol: Aspirante (nuevos) o Estudiante (ya matriculados antes)\n\n"
-            "2. Completa tus datos personales\n"
-            "   - Foto tipo carnet (fondo blanco)\n"
-            "   - PDF cedula (anverso y reverso en un solo archivo)\n"
-            "   - Certificado de votacion vigente\n"
-            "   - Titulo de Bachiller en PDF\n\n"
-            "3. Selecciona la matricula\n"
-            "   - Ve a: Pregrado > Matricula / Inscripcion a Semestre\n"
-            "   - Elige carrera, modalidad y periodo S1-2026\n"
-            "   - Revisa y confirma tu horario de clases\n\n"
-            "4. Genera tu comprobante\n"
-            "   - Descarga o imprime el comprobante de matricula\n\n"
-            "El proceso es 100% gratuito y en linea.\n"
-            "Soporte: 0986616388 / 0999304713\n"
-            "Horario: 08:00-12:00 y 14:00-17:00"
-        ),
-        "carreras_web": (
-            "Ingenieria Civil\n"
-            "Ingenieria Industrial\n"
-            "Ingenieria Quimica\n"
-            "Electronica y Automatizacion\n"
-            "Electricidad\n"
-            "Biotecnologia\n"
-            "Geologia\n"
-            "Mecatronica\n"
-            "Biologia\n"
-            "Quimica\n"
-            "Fisica\n"
-            "Medicina\n"
-            "Enfermeria\n"
-            "Odontologia\n"
-            "Nutricion y Dietetica\n"
-            "Bioquimica y Farmacia\n"
-            "Medicina Veterinaria\n"
-            "Agroindustria\n"
-            "Agronegocios (Modalidad Hibrida)\n"
-            "Biodiversidad y Recursos Geneticos\n"
-            "Sistemas de Informacion\n"
-            "Tecnologias de la Informacion\n"
-            "Tecnologias de la Informacion (En Linea)\n"
-            "Realidad Virtual y Videojuegos (Hibrida)\n"
-            "Economia (Hibrida)\n"
-            "Economia (En Linea)\n"
-            "Contabilidad y Auditoria (Hibrida)\n"
-            "Administracion de Empresas (Hibrida)\n"
-            "Administracion de Empresas (En Linea)\n"
-            "Turismo (Hibrida)\n"
-            "Turismo (En Linea)\n"
-            "Negocios Digitales (En Linea)\n"
-            "Logistica y Transporte\n"
-            "Gastronomia\n"
-            "Educacion Basica (En Linea)\n"
-            "Educacion Inicial (En Linea)\n"
-            "Pedagogia de los Idiomas Nacionales y Extranjeros\n"
-            "Pedagogia de las Ciencias Experimentales (Quimica y Biologia)\n"
-            "Pedagogia de las Ciencias Experimentales (Matematicas y Fisica)\n"
-            "Pedagogia de Actividad Fisica y Deporte\n"
-            "Pedagogia de la Lengua y Literatura\n"
-            "Entrenamiento Deportivo\n"
-            "Psicologia (En Linea)\n"
-            "Trabajo Social\n"
-            "Derecho (Hibrida)\n"
-            "Derecho (En Linea)\n"
-            "Sociologia (Hibrida)\n"
-            "Tecnologias Geoespaciales"
-        ),
-    }
-    for clave, valor in info_base.items():
+    for clave, valor in INFO_BASE.items():
         conn.execute("""
             INSERT INTO info_utm (clave, valor, actualizado)
             VALUES (%s, %s, NOW())
-            ON CONFLICT (clave) DO UPDATE
-            SET valor = EXCLUDED.valor, actualizado = NOW()
+            ON CONFLICT (clave) DO NOTHING
         """, (clave, valor))
     conn.commit()
-    logger.info("✅ Tablas e info base listas")
+    logger.info("Tablas e info base listas")
 
 def guardar_usuario(user):
     try:
@@ -204,10 +231,47 @@ def obtener_info(clave):
         result = conn.execute(
             "SELECT valor FROM info_utm WHERE clave = %s", (clave,)
         ).fetchone()
-        return result[0] if result else None
+        return result[0] if result else INFO_BASE.get(clave)
     except Exception as e:
         logger.error(f"Error al obtener info: {e}")
-        return None
+        return INFO_BASE.get(clave)
+
+def markup_botones(botones):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(texto, url=url) for texto, url in botones]
+    ])
+
+def texto_contacto(completo=False):
+    texto = (
+        "Contacto UTM\n\n"
+        "Web: www.utm.edu.ec\n"
+        "Email: info@utm.edu.ec\n"
+    )
+    if completo:
+        texto += "Direccion: Av. Urbina y Che Guevara, Portoviejo, Manabi\n\n"
+    else:
+        texto += "Portoviejo, Manabi\n\n"
+    texto += (
+        f"WhatsApp:\n{CONTACTO_WHATSAPP}\n"
+        f"Horario: {HORARIO_ATENCION}"
+    )
+    if completo:
+        texto += (
+            "\n\nRedes sociales:\n"
+            "Twitter: @UTMManabi\n"
+            "Instagram: @utm_manabi\n"
+            "Facebook: utmmanabi\n"
+            "TikTok: @utm_manabi"
+        )
+    return texto
+
+async def enviar_seccion_db(message, seccion, footer=""):
+    titulo, clave, botones = SECCIONES_DB[seccion]
+    info = obtener_info(clave) or "Informacion no disponible. Visita www.utm.edu.ec"
+    await message.reply_text(
+        f"{titulo}\n\n{info}{footer}",
+        reply_markup=markup_botones(botones)
+    )
 
 def menu_principal():
     teclado = [
@@ -261,50 +325,18 @@ async def cmd_miid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"Tu ID de Telegram es: {update.effective_user.id}")
 
 async def cmd_admisiones(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    info = obtener_info("admisiones")
-    await update.message.reply_text(
-        f"Admisiones UTM\n\n{info}",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("Postulacion UTM", url="https://postulacion.utm.edu.ec")
-        ]])
-    )
+    await enviar_seccion_db(update.message, "admision")
 
 async def cmd_matricula(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    info = obtener_info("matricula")
-    await update.message.reply_text(
-        f"Matricula UTM - SGU\n\n{info}",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("Ir al SGU", url="https://sgu.utm.edu.ec/auth/login")
-        ]])
-    )
+    await enviar_seccion_db(update.message, "matricula")
 
 async def cmd_carreras(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    carreras = obtener_info("carreras_web")
-    await update.message.reply_text(
-        f"Carreras UTM\n\n{carreras}\n\nVer todas en utm.edu.ec",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("Ver facultades", url="https://www.utm.edu.ec/oferta-academica/grado/facultades")
-        ]])
-    )
+    await enviar_seccion_db(update.message, "carreras", footer="\n\nVer todas en utm.edu.ec")
 
 async def cmd_contacto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Contacto UTM\n\n"
-        "Web: www.utm.edu.ec\n"
-        "Email: info@utm.edu.ec\n"
-        "Direccion: Av. Urbina y Che Guevara, Portoviejo, Manabi\n\n"
-        "WhatsApp:\n"
-        "0986616388\n"
-        "0999304713\n"
-        "Horario: 08:00-12:00 y 14:00-17:00\n\n"
-        "Redes sociales:\n"
-        "Twitter: @UTMManabi\n"
-        "Instagram: @utm_manabi\n"
-        "Facebook: utmmanabi\n"
-        "TikTok: @utm_manabi",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("Visitar utm.edu.ec", url="https://www.utm.edu.ec")
-        ]])
+        texto_contacto(completo=True),
+        reply_markup=markup_botones([("Visitar utm.edu.ec", "https://www.utm.edu.ec")])
     )
 
 async def cmd_horarios(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -318,38 +350,14 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     dato = query.data
 
-    if dato == "admision":
-        info = obtener_info("admisiones")
-        await query.message.reply_text(
-            f"Admisiones UTM\n\n{info}",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Postulacion UTM", url="https://postulacion.utm.edu.ec")
-            ]])
-        )
-    elif dato == "matricula":
-        info = obtener_info("matricula")
-        await query.message.reply_text(
-            f"Matricula UTM - SGU\n\n{info}",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Ir al SGU", url="https://sgu.utm.edu.ec/auth/login")
-            ]])
-        )
-    elif dato == "carreras":
-        carreras = obtener_info("carreras_web")
-        await query.message.reply_text(
-            f"Carreras UTM\n\n{carreras}",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Ver facultades", url="https://www.utm.edu.ec/oferta-academica/grado/facultades")
-            ]])
-        )
+    if dato in SECCIONES_DB:
+        await enviar_seccion_db(query.message, dato)
     elif dato == "costo":
         await query.message.reply_text(
             "Costos UTM\n\n"
             "La UTM es universidad publica y gratuita.\n"
             "La matriculacion no tiene ningun costo.",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Ver utm.edu.ec", url="https://www.utm.edu.ec")
-            ]])
+            reply_markup=markup_botones([("Ver utm.edu.ec", "https://www.utm.edu.ec")])
         )
     elif dato == "horario":
         await query.message.reply_text(
@@ -362,23 +370,12 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Ubicacion UTM\n\n"
             "Av. Urbina y Che Guevara\n"
             "Portoviejo, Manabi, Ecuador",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Ver en Google Maps", url="https://maps.google.com/?q=Universidad+Tecnica+de+Manabi+Portoviejo")
-            ]])
+            reply_markup=markup_botones([("Ver en Google Maps", "https://maps.google.com/?q=Universidad+Tecnica+de+Manabi+Portoviejo")])
         )
     elif dato == "contacto":
         await query.message.reply_text(
-            "Contacto UTM\n\n"
-            "Web: www.utm.edu.ec\n"
-            "Email: info@utm.edu.ec\n"
-            "Portoviejo, Manabi\n\n"
-            "WhatsApp:\n"
-            "0986616388\n"
-            "0999304713\n"
-            "Horario: 08:00-12:00 y 14:00-17:00",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Visitar utm.edu.ec", url="https://www.utm.edu.ec")
-            ]])
+            texto_contacto(),
+            reply_markup=markup_botones([("Visitar utm.edu.ec", "https://www.utm.edu.ec")])
         )
 
 async def bienvenida(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -406,9 +403,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     guardar_usuario(user)
 
     if es_grupo and re.search(r"http[s]?://", texto):
-        if user.id in ADMINS:
-            pass
-        else:
+        if user.id not in ADMINS:
             adv = advertir_usuario(user.id)
             try:
                 await update.message.delete()
@@ -439,46 +434,21 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto_lower = texto.lower()
 
     if any(p in texto_lower for p in ["admis", "inscripci", "ingreso", "postula"]):
-        info = obtener_info("admisiones")
-        await update.message.reply_text(
-            f"Admisiones UTM\n\n{info}",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Postulacion UTM", url="https://postulacion.utm.edu.ec")
-            ]])
-        )
+        await enviar_seccion_db(update.message, "admision")
         return
 
     if any(p in texto_lower for p in ["matricula", "matrícula", "materias", "paralelo", "sgu", "sga", "sistema de gestion", "como matricul"]):
-        info = obtener_info("matricula")
-        await update.message.reply_text(
-            f"Matricula UTM\n\n{info}",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Ir al SGU", url="https://sgu.utm.edu.ec/auth/login")
-            ]])
-        )
+        await enviar_seccion_db(update.message, "matricula")
         return
 
     if any(p in texto_lower for p in ["carrera", "facultad", "oferta"]):
-        carreras = obtener_info("carreras_web")
-        await update.message.reply_text(
-            f"Carreras UTM\n\n{carreras}",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Ver facultades", url="https://www.utm.edu.ec/oferta-academica/grado/facultades")
-            ]])
-        )
+        await enviar_seccion_db(update.message, "carreras")
         return
 
     if any(p in texto_lower for p in ["contacto", "whatsapp", "telefono", "teléfono"]):
         await update.message.reply_text(
-            "Contacto UTM\n\n"
-            "WhatsApp:\n"
-            "0986616388\n"
-            "0999304713\n"
-            "Horario: 08:00-12:00 y 14:00-17:00\n\n"
-            "Email: info@utm.edu.ec",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Visitar utm.edu.ec", url="https://www.utm.edu.ec")
-            ]])
+            texto_contacto(),
+            reply_markup=markup_botones([("Visitar utm.edu.ec", "https://www.utm.edu.ec")])
         )
         return
 
@@ -503,9 +473,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Ubicacion UTM\n\n"
             "Av. Urbina y Che Guevara\n"
             "Portoviejo, Manabi, Ecuador",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Ver en Google Maps", url="https://maps.google.com/?q=Universidad+Tecnica+de+Manabi+Portoviejo")
-            ]])
+            reply_markup=markup_botones([("Ver en Google Maps", "https://maps.google.com/?q=Universidad+Tecnica+de+Manabi+Portoviejo")])
         )
         return
 
@@ -534,15 +502,15 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Carreras UTM:\n{carreras}\n\n"
             f"Usuario: {texto}"
         )
-        response = client.models.generate_content(
+        response = await asyncio.to_thread(
+            client.models.generate_content,
             model="gemini-2.0-flash",
             contents=prompt
         )
+        respuesta = response.text or "No pude generar una respuesta. Visita www.utm.edu.ec"
         await update.message.reply_text(
-            response.text,
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Mas info en utm.edu.ec", url="https://www.utm.edu.ec")
-            ]])
+            respuesta,
+            reply_markup=markup_botones([("Mas info en utm.edu.ec", "https://www.utm.edu.ec")])
         )
 
     except Exception as e:
@@ -550,9 +518,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "No pude procesar tu pregunta.\n"
             "Visita utm.edu.ec o contactanos por WhatsApp al 0986616388.",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("utm.edu.ec", url="https://www.utm.edu.ec")
-            ]])
+            reply_markup=markup_botones([("utm.edu.ec", "https://www.utm.edu.ec")])
         )
 
 if __name__ == "__main__":
@@ -574,5 +540,5 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, bienvenida))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, manejar_mensaje))
 
-    logger.info("🤖 Bot UTM corriendo...")
+    logger.info("Bot UTM corriendo...")
     app.run_polling()
