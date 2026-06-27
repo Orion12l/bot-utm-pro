@@ -686,6 +686,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 if __name__ == "__main__":
+    print(f"=== BOT UTM {BOT_VERSION} ===", flush=True)
     logger.info("Iniciando bot UTM version %s", BOT_VERSION)
     logger.info("Candidatos de BD: %s", [ _db_host(u) for u in DATABASE_URLS ] or ["ninguno"])
 
