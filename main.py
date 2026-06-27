@@ -142,6 +142,8 @@ INFO_BASE = {
     "carreras_web": INFO_CARRERAS,
 }
 
+SYNC_VERSION = "2026-06-27-v1"
+
 SECCIONES_DB = {
     "admision": ("Admisiones UTM", "admisiones", [("Postulacion UTM", "https://postulacion.utm.edu.ec")]),
     "matricula": ("Matricula UTM - SGU", "matricula", [("Ir al SGU", "https://sgu.utm.edu.ec/auth/login")]),
@@ -197,6 +199,31 @@ def init_db():
         """, (clave, valor))
     conn.commit()
     logger.info("Tablas e info base listas")
+
+def sync_info_utm():
+    """Actualiza info_utm cuando cambia SYNC_VERSION (una vez por deploy)."""
+    conn = get_conn()
+    actual = conn.execute(
+        "SELECT valor FROM info_utm WHERE clave = '_sync_version'"
+    ).fetchone()
+    if actual and actual[0] == SYNC_VERSION:
+        return
+
+    for clave, valor in INFO_BASE.items():
+        conn.execute("""
+            INSERT INTO info_utm (clave, valor, actualizado)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (clave) DO UPDATE
+            SET valor = EXCLUDED.valor, actualizado = NOW()
+        """, (clave, valor))
+    conn.execute("""
+        INSERT INTO info_utm (clave, valor, actualizado)
+        VALUES ('_sync_version', %s, NOW())
+        ON CONFLICT (clave) DO UPDATE
+        SET valor = EXCLUDED.valor, actualizado = NOW()
+    """, (SYNC_VERSION,))
+    conn.commit()
+    logger.info("Info UTM sincronizada (version %s)", SYNC_VERSION)
 
 def guardar_usuario(user):
     try:
@@ -523,6 +550,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == "__main__":
     init_db()
+    sync_info_utm()
 
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 

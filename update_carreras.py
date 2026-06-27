@@ -53,7 +53,13 @@ Derecho (En Linea)
 Sociologia (Hibrida)
 Tecnologias Geoespaciales"""
 
-with psycopg.connect(os.getenv("DATABASE_URL")) as conn:
+def _db_url():
+    url = os.getenv("DATABASE_URL", "")
+    if "sslmode=" not in url:
+        url += "&sslmode=require" if "?" in url else "?sslmode=require"
+    return url
+
+with psycopg.connect(_db_url()) as conn:
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS info_utm (

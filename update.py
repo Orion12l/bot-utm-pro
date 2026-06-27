@@ -17,7 +17,13 @@ admisiones = (
     "Horario: 08:00-12:00 y 14:00-18:00"
 )
 
-with psycopg.connect(os.getenv("DATABASE_URL")) as conn:
+def _db_url():
+    url = os.getenv("DATABASE_URL", "")
+    if "sslmode=" not in url:
+        url += "&sslmode=require" if "?" in url else "?sslmode=require"
+    return url
+
+with psycopg.connect(_db_url()) as conn:
     conn.execute(
         """
         INSERT INTO info_utm (clave, valor, actualizado)
