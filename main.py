@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import threading
 import asyncio
 import logging
 from urllib.parse import quote, urlparse
@@ -224,8 +225,9 @@ for var_name, var_val in [("TELEGRAM_TOKEN", TELEGRAM_TOKEN),
     if not var_val:
         raise EnvironmentError(f"Falta la variable de entorno: {var_name}")
 
-if not DATABASE_URLS:
-    raise EnvironmentError("Falta DATABASE_URL o DATABASE_PUBLIC_URL")
+DB_DISPONIBLE = bool(DATABASE_URLS)
+if not DB_DISPONIBLE:
+    logger.warning("Sin DATABASE_URL: el bot usara info local sin persistencia")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -234,6 +236,8 @@ _active_db_url = None
 
 def connect_db():
     global _conn, _active_db_url
+    if not DATABASE_URLS:
+        raise psycopg.OperationalError("DATABASE_URL no configurada")
     errors = []
     for url in database_url_candidates():
         try:
@@ -250,6 +254,8 @@ def connect_db():
 
 def get_conn():
     global _conn
+    if not DB_DISPONIBLE:
+        raise psycopg.OperationalError("Base de datos no disponible")
     try:
         if _conn is None or _conn.closed:
             raise Exception("Conexion cerrada")
@@ -259,17 +265,42 @@ def get_conn():
         connect_db()
     return _conn
 
-def bootstrap_db(max_attempts=10, delay=3):
+def bootstrap_db(max_attempts=3, delay=2):
+    global DB_DISPONIBLE
+    if not DATABASE_URLS:
+        DB_DISPONIBLE = False
+        return False
+
     for attempt in range(1, max_attempts + 1):
         try:
             init_db()
             sync_info_utm()
-            return
+            DB_DISPONIBLE = True
+            return True
         except Exception as exc:
             logger.error("Intento %d/%d de conexion a BD: %s", attempt, max_attempts, exc)
-            if attempt == max_attempts:
-                raise
-            time.sleep(delay)
+            if attempt < max_attempts:
+                time.sleep(delay)
+
+    DB_DISPONIBLE = False
+    logger.warning("Bot iniciara sin base de datos. Usando info local.")
+    return False
+
+def reintentar_db_en_background():
+    def _loop():
+        global DB_DISPONIBLE
+        while not DB_DISPONIBLE:
+            time.sleep(30)
+            try:
+                init_db()
+                sync_info_utm()
+                DB_DISPONIBLE = True
+                logger.info("Base de datos conectada en segundo plano")
+                return
+            except Exception as exc:
+                logger.warning("Reintento de BD fallido: %s", exc)
+
+    threading.Thread(target=_loop, daemon=True).start()
 
 def init_db():
     conn = get_conn()
@@ -648,7 +679,8 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 if __name__ == "__main__":
-    bootstrap_db()
+    if not bootstrap_db():
+        reintentar_db_en_background()
 
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
@@ -667,4 +699,4 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, manejar_mensaje))
 
     logger.info("Bot UTM corriendo...")
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True)
