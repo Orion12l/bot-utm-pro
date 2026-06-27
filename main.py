@@ -145,7 +145,7 @@ INFO_BASE = {
 }
 
 SYNC_VERSION = "2026-06-27-v3"
-BOT_VERSION = "2026-06-27-v4"
+BOT_VERSION = "2026-06-27-v5"
 
 SECCIONES_DB = {
     "admision": ("Admisiones UTM", "admisiones", [("Postulacion UTM", "https://postulacion.utm.edu.ec")]),
@@ -685,16 +685,16 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=markup_botones([("utm.edu.ec", "https://www.utm.edu.ec")])
         )
 
-if __name__ == "__main__":
-    print(f"=== BOT UTM {BOT_VERSION} ===", flush=True)
-    logger.info("Iniciando bot UTM version %s", BOT_VERSION)
-    logger.info("Candidatos de BD: %s", [ _db_host(u) for u in DATABASE_URLS ] or ["ninguno"])
-
-    if not bootstrap_db():
+def iniciar_bd_en_background():
+    def _tarea():
+        if bootstrap_db():
+            return
         reintentar_db_en_background()
 
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    threading.Thread(target=_tarea, daemon=True).start()
 
+def crear_app():
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start",      cmd_start))
     app.add_handler(CommandHandler("ayuda",      cmd_ayuda))
     app.add_handler(CommandHandler("help",       cmd_ayuda))
@@ -704,10 +704,18 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("carreras",   cmd_carreras))
     app.add_handler(CommandHandler("contacto",   cmd_contacto))
     app.add_handler(CommandHandler("horarios",   cmd_horarios))
-
     app.add_handler(CallbackQueryHandler(manejar_botones))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, bienvenida))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, manejar_mensaje))
+    return app
+
+if __name__ == "__main__":
+    print(f"=== BOT UTM {BOT_VERSION} ===", flush=True)
+    logger.info("Iniciando bot UTM version %s", BOT_VERSION)
+    logger.info("Candidatos de BD: %s", [_db_host(u) for u in DATABASE_URLS] or ["ninguno - modo local"])
+
+    iniciar_bd_en_background()
+    app = crear_app()
 
     logger.info("Bot UTM corriendo...")
     app.run_polling(drop_pending_updates=True)
