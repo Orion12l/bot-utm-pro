@@ -151,7 +151,7 @@ INFO_BASE = {
     "carreras_web": INFO_CARRERAS,
 }
 
-SYNC_VERSION = "2026-06-27-v4"
+SYNC_VERSION = "2026-06-27-v7"
 BOT_VERSION = "2026-06-27-v7"
 MSG_TTL_SEG = 600
 _usuarios_vistos_local = set()
@@ -819,11 +819,14 @@ def crear_app():
 
 if __name__ == "__main__":
     print(f"=== BOT UTM {BOT_VERSION} ===", flush=True)
+    print(f"Telegram arranca primero, BD en background ({BOT_VERSION})", flush=True)
     logger.info("Iniciando bot UTM version %s", BOT_VERSION)
+    logger.info("Modo: Telegram arranca primero, BD en background")
     logger.info("Candidatos de BD: %s", [_db_host(u) for u in DATABASE_URLS] or ["ninguno - modo local"])
 
     iniciar_bd_en_background()
+    logger.info("Hilo de BD iniciado en segundo plano")
     app = crear_app()
 
-    logger.info("Bot UTM corriendo...")
+    logger.info("Bot UTM corriendo (polling Telegram)...")
     app.run_polling(drop_pending_updates=True)

@@ -11,5 +11,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Forzar rebuild: v4
+# Forzar rebuild: v7
 CMD ["python", "-u", "main.py"]
