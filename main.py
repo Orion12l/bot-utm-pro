@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import asyncio
 import logging
 import psycopg
@@ -25,7 +26,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-DATABASE_URL   = os.getenv("DATABASE_URL")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 BOT_USERNAME   = os.getenv("BOT_USERNAME", "@utm_help_bot").lower()
 
@@ -142,7 +142,7 @@ INFO_BASE = {
     "carreras_web": INFO_CARRERAS,
 }
 
-SYNC_VERSION = "2026-06-27-v1"
+SYNC_VERSION = "2026-06-27-v2"
 
 SECCIONES_DB = {
     "admision": ("Admisiones UTM", "admisiones", [("Postulacion UTM", "https://postulacion.utm.edu.ec")]),
@@ -150,15 +150,71 @@ SECCIONES_DB = {
     "carreras": ("Carreras UTM", "carreras_web", [("Ver facultades", "https://www.utm.edu.ec/oferta-academica/grado/facultades")]),
 }
 
+def _normalize_db_url(url):
+    if not url:
+        return url
+    if "sslmode=" not in url and ("proxy.rlwy.net" in url or "roundhouse.proxy.rlwy.net" in url):
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}sslmode=require"
+    return url
+
+def _db_host(url):
+    if "@" not in url:
+        return "desconocido"
+    return url.split("@", 1)[1].split("/", 1)[0]
+
+def database_url_candidates():
+    private = os.getenv("DATABASE_URL", "")
+    public = os.getenv("DATABASE_PUBLIC_URL", "")
+    ordered = []
+
+    if "railway.internal" in private and public:
+        ordered.extend([public, private])
+    else:
+        if private:
+            ordered.append(private)
+        if public:
+            ordered.append(public)
+
+    seen = set()
+    candidates = []
+    for url in ordered:
+        normalized = _normalize_db_url(url)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            candidates.append(normalized)
+    return candidates
+
+DATABASE_URLS = database_url_candidates()
+
 for var_name, var_val in [("TELEGRAM_TOKEN", TELEGRAM_TOKEN),
-                           ("DATABASE_URL",   DATABASE_URL),
                            ("GEMINI_API_KEY", GEMINI_API_KEY)]:
     if not var_val:
         raise EnvironmentError(f"Falta la variable de entorno: {var_name}")
 
+if not DATABASE_URLS:
+    raise EnvironmentError("Falta DATABASE_URL o DATABASE_PUBLIC_URL")
+
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 _conn = None
+_active_db_url = None
+
+def connect_db():
+    global _conn, _active_db_url
+    errors = []
+    for url in database_url_candidates():
+        try:
+            conn = psycopg.connect(url)
+            _conn = conn
+            _active_db_url = url
+            logger.info("Conectado a PostgreSQL (%s)", _db_host(url))
+            return conn
+        except Exception as exc:
+            host = _db_host(url)
+            logger.warning("Fallo conexion %s: %s", host, exc)
+            errors.append(f"{host}: {exc}")
+    raise psycopg.OperationalError("; ".join(errors))
 
 def get_conn():
     global _conn
@@ -168,9 +224,20 @@ def get_conn():
         _conn.execute("SELECT 1")
     except Exception:
         logger.warning("Reconectando a PostgreSQL...")
-        _conn = psycopg.connect(DATABASE_URL)
-        logger.info("Reconexion exitosa")
+        connect_db()
     return _conn
+
+def bootstrap_db(max_attempts=10, delay=3):
+    for attempt in range(1, max_attempts + 1):
+        try:
+            init_db()
+            sync_info_utm()
+            return
+        except Exception as exc:
+            logger.error("Intento %d/%d de conexion a BD: %s", attempt, max_attempts, exc)
+            if attempt == max_attempts:
+                raise
+            time.sleep(delay)
 
 def init_db():
     conn = get_conn()
@@ -549,8 +616,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 if __name__ == "__main__":
-    init_db()
-    sync_info_utm()
+    bootstrap_db()
 
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
