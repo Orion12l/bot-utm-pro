@@ -3,6 +3,7 @@ import re
 import time
 import asyncio
 import logging
+from urllib.parse import quote, urlparse
 import psycopg
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -142,7 +143,7 @@ INFO_BASE = {
     "carreras_web": INFO_CARRERAS,
 }
 
-SYNC_VERSION = "2026-06-27-v2"
+SYNC_VERSION = "2026-06-27-v3"
 
 SECCIONES_DB = {
     "admision": ("Admisiones UTM", "admisiones", [("Postulacion UTM", "https://postulacion.utm.edu.ec")]),
@@ -153,7 +154,7 @@ SECCIONES_DB = {
 def _normalize_db_url(url):
     if not url:
         return url
-    if "sslmode=" not in url and ("proxy.rlwy.net" in url or "roundhouse.proxy.rlwy.net" in url):
+    if "sslmode=" not in url and "proxy.rlwy.net" in url:
         sep = "&" if "?" in url else "?"
         url = f"{url}{sep}sslmode=require"
     return url
@@ -163,18 +164,49 @@ def _db_host(url):
         return "desconocido"
     return url.split("@", 1)[1].split("/", 1)[0]
 
+def _parsed_database_url():
+    return urlparse(os.getenv("DATABASE_URL", ""))
+
+def _compose_db_url(user, password, host, port, database):
+    if not all([user, password, host, port, database]):
+        return None
+    safe_user = quote(user, safe="")
+    safe_password = quote(password, safe="")
+    return f"postgresql://{safe_user}:{safe_password}@{host}:{port}/{database}"
+
+def _build_tcp_proxy_url():
+    domain = os.getenv("RAILWAY_TCP_PROXY_DOMAIN")
+    port = os.getenv("RAILWAY_TCP_PROXY_PORT")
+    if not domain or not port:
+        return None
+
+    parsed = _parsed_database_url()
+    user = os.getenv("PGUSER") or parsed.username or "postgres"
+    password = os.getenv("PGPASSWORD") or parsed.password
+    database = os.getenv("PGDATABASE") or (parsed.path.lstrip("/") if parsed.path else "railway")
+    return _compose_db_url(user, password, domain, port, database)
+
+def _build_pg_url():
+    host = os.getenv("PGHOST")
+    port = os.getenv("PGPORT", "5432")
+    user = os.getenv("PGUSER") or "postgres"
+    password = os.getenv("PGPASSWORD")
+    database = os.getenv("PGDATABASE") or "railway"
+    if not host or "railway.internal" in host:
+        return None
+    return _compose_db_url(user, password, host, port, database)
+
 def database_url_candidates():
     private = os.getenv("DATABASE_URL", "")
     public = os.getenv("DATABASE_PUBLIC_URL", "")
+    tcp_proxy = _build_tcp_proxy_url()
+    pg_url = _build_pg_url()
     ordered = []
 
-    if "railway.internal" in private and public:
-        ordered.extend([public, private])
+    if "railway.internal" in private:
+        ordered.extend([public, tcp_proxy, pg_url, private])
     else:
-        if private:
-            ordered.append(private)
-        if public:
-            ordered.append(public)
+        ordered.extend([private, public, tcp_proxy, pg_url])
 
     seen = set()
     candidates = []
