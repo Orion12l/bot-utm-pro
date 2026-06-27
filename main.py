@@ -145,6 +145,7 @@ INFO_BASE = {
 }
 
 SYNC_VERSION = "2026-06-27-v3"
+BOT_VERSION = "2026-06-27-v4"
 
 SECCIONES_DB = {
     "admision": ("Admisiones UTM", "admisiones", [("Postulacion UTM", "https://postulacion.utm.edu.ec")]),
@@ -213,7 +214,9 @@ def database_url_candidates():
     candidates = []
     for url in ordered:
         normalized = _normalize_db_url(url)
-        if normalized and normalized not in seen:
+        if not normalized or "railway.internal" in normalized:
+            continue
+        if normalized not in seen:
             seen.add(normalized)
             candidates.append(normalized)
     return candidates
@@ -287,6 +290,10 @@ def bootstrap_db(max_attempts=3, delay=2):
     return False
 
 def reintentar_db_en_background():
+    if not DATABASE_URLS:
+        logger.warning("Sin URL publica de BD. Agrega DATABASE_PUBLIC_URL en Railway.")
+        return
+
     def _loop():
         global DB_DISPONIBLE
         while not DB_DISPONIBLE:
@@ -679,6 +686,9 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 if __name__ == "__main__":
+    logger.info("Iniciando bot UTM version %s", BOT_VERSION)
+    logger.info("Candidatos de BD: %s", [ _db_host(u) for u in DATABASE_URLS ] or ["ninguno"])
+
     if not bootstrap_db():
         reintentar_db_en_background()
 
