@@ -45,6 +45,13 @@ CONTACTO_WHATSAPP = (
 )
 HORARIO_ATENCION = "08:00-12:00 y 14:00-18:00"
 
+URL_POSTULACION = "https://postulacion.utm.edu.ec"
+URL_SGU = "https://sgu.utm.edu.ec/auth/login"
+AVISO_WEB_UTM = (
+    "Nota: www.utm.edu.ec esta en mantenimiento.\n"
+    "Usa postulacion.utm.edu.ec (admisiones) o sgu.utm.edu.ec (matricula)."
+)
+
 INFO_ADMISIONES = (
     "Admisiones UTM 2026:\n"
     "- Inscripciones: 24 enero - 01 febrero\n"
@@ -144,13 +151,13 @@ INFO_BASE = {
     "carreras_web": INFO_CARRERAS,
 }
 
-SYNC_VERSION = "2026-06-27-v3"
-BOT_VERSION = "2026-06-27-v5"
+SYNC_VERSION = "2026-06-27-v4"
+BOT_VERSION = "2026-06-27-v6"
 
 SECCIONES_DB = {
-    "admision": ("Admisiones UTM", "admisiones", [("Postulacion UTM", "https://postulacion.utm.edu.ec")]),
-    "matricula": ("Matricula UTM - SGU", "matricula", [("Ir al SGU", "https://sgu.utm.edu.ec/auth/login")]),
-    "carreras": ("Carreras UTM", "carreras_web", [("Ver facultades", "https://www.utm.edu.ec/oferta-academica/grado/facultades")]),
+    "admision": ("Admisiones UTM", "admisiones", [("Postulacion UTM", URL_POSTULACION)]),
+    "matricula": ("Matricula UTM - SGU", "matricula", [("Ir al SGU", URL_SGU)]),
+    "carreras": ("Carreras UTM", "carreras_web", [("Portal postulacion", URL_POSTULACION)]),
 }
 
 def _normalize_db_url(url):
@@ -408,7 +415,7 @@ def markup_botones(botones):
 def texto_contacto(completo=False):
     texto = (
         "Contacto UTM\n\n"
-        "Web: www.utm.edu.ec\n"
+        f"{AVISO_WEB_UTM}\n\n"
         "Email: info@utm.edu.ec\n"
     )
     if completo:
@@ -431,7 +438,7 @@ def texto_contacto(completo=False):
 
 async def enviar_seccion_db(message, seccion, footer=""):
     titulo, clave, botones = SECCIONES_DB[seccion]
-    info = obtener_info(clave) or "Informacion no disponible. Visita www.utm.edu.ec"
+    info = obtener_info(clave) or f"Informacion no disponible. {AVISO_WEB_UTM}"
     await message.reply_text(
         f"{titulo}\n\n{info}{footer}",
         reply_markup=markup_botones(botones)
@@ -453,7 +460,8 @@ def menu_principal():
         ],
         [
             InlineKeyboardButton("📞 Contacto",   callback_data="contacto"),
-            InlineKeyboardButton("🌐 Sitio UTM",  url="https://www.utm.edu.ec"),
+            InlineKeyboardButton("📝 Postulacion", url=URL_POSTULACION),
+            InlineKeyboardButton("🎓 SGU",         url=URL_SGU),
         ],
     ]
     return InlineKeyboardMarkup(teclado)
@@ -495,12 +503,12 @@ async def cmd_matricula(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await enviar_seccion_db(update.message, "matricula")
 
 async def cmd_carreras(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await enviar_seccion_db(update.message, "carreras", footer="\n\nVer todas en utm.edu.ec")
+    await enviar_seccion_db(update.message, "carreras", footer=f"\n\n{AVISO_WEB_UTM}")
 
 async def cmd_contacto(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         texto_contacto(completo=True),
-        reply_markup=markup_botones([("Visitar utm.edu.ec", "https://www.utm.edu.ec")])
+        reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)])
     )
 
 async def cmd_horarios(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -521,7 +529,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Costos UTM\n\n"
             "La UTM es universidad publica y gratuita.\n"
             "La matriculacion no tiene ningun costo.",
-            reply_markup=markup_botones([("Ver utm.edu.ec", "https://www.utm.edu.ec")])
+            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION)])
         )
     elif dato == "horario":
         await query.message.reply_text(
@@ -539,7 +547,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif dato == "contacto":
         await query.message.reply_text(
             texto_contacto(),
-            reply_markup=markup_botones([("Visitar utm.edu.ec", "https://www.utm.edu.ec")])
+            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)])
         )
 
 async def bienvenida(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -612,7 +620,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if any(p in texto_lower for p in ["contacto", "whatsapp", "telefono", "teléfono"]):
         await update.message.reply_text(
             texto_contacto(),
-            reply_markup=markup_botones([("Visitar utm.edu.ec", "https://www.utm.edu.ec")])
+            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)])
         )
         return
 
@@ -659,7 +667,8 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "IMPORTANTE: La UTM ya NO usa el SGA (Sistema de Gestion Academica). "
             "Ahora usa el SGU (Sistema de Gestion Universitaria) en sgu.utm.edu.ec. "
             "Si alguien pregunta por el SGA, corrigelo y dirige al SGU. "
-            "No inventes informacion. Si no sabes algo, sugiere visitar www.utm.edu.ec "
+            "No inventes informacion. Si no sabes algo, sugiere postulacion.utm.edu.ec o sgu.utm.edu.ec. "
+            "www.utm.edu.ec esta en mantenimiento. "
             "o contactar por WhatsApp al 0986616388.\n\n"
             f"Admisiones UTM:\n{admisiones}\n\n"
             f"Matricula UTM (SGU):\n{matricula}\n\n"
@@ -671,18 +680,18 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
             model="gemini-2.0-flash",
             contents=prompt
         )
-        respuesta = response.text or "No pude generar una respuesta. Visita www.utm.edu.ec"
+        respuesta = response.text or f"No pude generar una respuesta. {AVISO_WEB_UTM}"
         await update.message.reply_text(
             respuesta,
-            reply_markup=markup_botones([("Mas info en utm.edu.ec", "https://www.utm.edu.ec")])
+            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)])
         )
 
     except Exception as e:
         logger.error(f"Error Gemini: {e}")
         await update.message.reply_text(
             "No pude procesar tu pregunta.\n"
-            "Visita utm.edu.ec o contactanos por WhatsApp al 0986616388.",
-            reply_markup=markup_botones([("utm.edu.ec", "https://www.utm.edu.ec")])
+            f"{AVISO_WEB_UTM}\nContactanos por WhatsApp al 0986616388.",
+            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)])
         )
 
 def iniciar_bd_en_background():
