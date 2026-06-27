@@ -152,7 +152,9 @@ INFO_BASE = {
 }
 
 SYNC_VERSION = "2026-06-27-v4"
-BOT_VERSION = "2026-06-27-v6"
+BOT_VERSION = "2026-06-27-v7"
+MSG_TTL_SEG = 600
+_usuarios_vistos_local = set()
 
 SECCIONES_DB = {
     "admision": ("Admisiones UTM", "admisiones", [("Postulacion UTM", URL_POSTULACION)]),
@@ -369,7 +371,27 @@ def sync_info_utm():
     conn.commit()
     logger.info("Info UTM sincronizada (version %s)", SYNC_VERSION)
 
+def es_grupo(chat):
+    return chat.type in ("group", "supergroup")
+
+def usuario_existe(telegram_id):
+    if telegram_id in _usuarios_vistos_local:
+        return True
+    if not DB_DISPONIBLE:
+        return False
+    try:
+        conn = get_conn()
+        return conn.execute(
+            "SELECT 1 FROM usuarios WHERE telegram_id = %s", (telegram_id,)
+        ).fetchone() is not None
+    except Exception as e:
+        logger.error(f"Error al consultar usuario: {e}")
+        return telegram_id in _usuarios_vistos_local
+
 def guardar_usuario(user):
+    _usuarios_vistos_local.add(user.id)
+    if not DB_DISPONIBLE:
+        return
     try:
         conn = get_conn()
         conn.execute("""
@@ -380,6 +402,53 @@ def guardar_usuario(user):
         conn.commit()
     except Exception as e:
         logger.error(f"Error al guardar usuario: {e}")
+
+async def _borrar_mensajes_job(context: ContextTypes.DEFAULT_TYPE):
+    data = context.job.data
+    for msg_id in data.get("message_ids", []):
+        try:
+            await context.bot.delete_message(chat_id=data["chat_id"], message_id=msg_id)
+        except Exception:
+            pass
+
+def programar_borrado(context, chat_id, message_ids):
+    if not context.job_queue:
+        return
+    ids = [mid for mid in message_ids if mid]
+    if not ids:
+        return
+    context.job_queue.run_once(
+        _borrar_mensajes_job,
+        when=MSG_TTL_SEG,
+        data={"chat_id": chat_id, "message_ids": ids},
+    )
+
+async def responder(message, context, texto, reply_markup=None, borrar_origen=True):
+    enviado = await message.reply_text(texto, reply_markup=reply_markup)
+    if es_grupo(message.chat):
+        ids = [enviado.message_id]
+        if borrar_origen and message.message_id:
+            ids.append(message.message_id)
+        programar_borrado(context, message.chat_id, ids)
+    return enviado
+
+async def responder_callback(query, context, texto, reply_markup=None):
+    enviado = await query.message.reply_text(texto, reply_markup=reply_markup)
+    if es_grupo(query.message.chat):
+        ids = [enviado.message_id]
+        if query.message.message_id:
+            ids.append(query.message.message_id)
+        programar_borrado(context, query.message.chat_id, ids)
+    return enviado
+
+async def enviar_temporal(chat, context, texto, reply_markup=None, extra_ids=None):
+    enviado = await context.bot.send_message(
+        chat.id, texto, reply_markup=reply_markup
+    )
+    if es_grupo(chat):
+        ids = [enviado.message_id] + list(extra_ids or [])
+        programar_borrado(context, chat.id, ids)
+    return enviado
 
 def advertir_usuario(user_id):
     try:
@@ -436,12 +505,13 @@ def texto_contacto(completo=False):
         )
     return texto
 
-async def enviar_seccion_db(message, seccion, footer=""):
+async def enviar_seccion_db(message, context, seccion, footer=""):
     titulo, clave, botones = SECCIONES_DB[seccion]
     info = obtener_info(clave) or f"Informacion no disponible. {AVISO_WEB_UTM}"
-    await message.reply_text(
+    await responder(
+        message, context,
         f"{titulo}\n\n{info}{footer}",
-        reply_markup=markup_botones(botones)
+        reply_markup=markup_botones(botones),
     )
 
 def menu_principal():
@@ -468,7 +538,8 @@ def menu_principal():
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     guardar_usuario(update.effective_user)
-    await update.message.reply_text(
+    await responder(
+        update.message, context,
         "Hola! Soy el asistente virtual de la UTM\n\n"
         "Puedo ayudarte con informacion sobre:\n"
         "Admisiones y matricula\n"
@@ -476,11 +547,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Horarios y costos\n"
         "Contacto\n\n"
         "Elige una opcion o escribe tu pregunta:",
-        reply_markup=menu_principal()
+        reply_markup=menu_principal(),
     )
 
 async def cmd_ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
+    await responder(
+        update.message, context,
         "Comandos disponibles:\n\n"
         "/start - Menu principal\n"
         "/ayuda - Ver esta ayuda\n"
@@ -490,31 +562,36 @@ async def cmd_ayuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/contacto - Datos de contacto\n"
         "/horarios - Horarios de atencion\n"
         "Tambien puedes escribir tu pregunta directamente.",
-        reply_markup=menu_principal()
+        reply_markup=menu_principal(),
     )
 
 async def cmd_miid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f"Tu ID de Telegram es: {update.effective_user.id}")
+    await responder(
+        update.message, context,
+        f"Tu ID de Telegram es: {update.effective_user.id}",
+    )
 
 async def cmd_admisiones(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await enviar_seccion_db(update.message, "admision")
+    await enviar_seccion_db(update.message, context, "admision")
 
 async def cmd_matricula(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await enviar_seccion_db(update.message, "matricula")
+    await enviar_seccion_db(update.message, context, "matricula")
 
 async def cmd_carreras(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await enviar_seccion_db(update.message, "carreras", footer=f"\n\n{AVISO_WEB_UTM}")
+    await enviar_seccion_db(update.message, context, "carreras", footer=f"\n\n{AVISO_WEB_UTM}")
 
 async def cmd_contacto(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
+    await responder(
+        update.message, context,
         texto_contacto(completo=True),
-        reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)])
+        reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)]),
     )
 
 async def cmd_horarios(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
+    await responder(
+        update.message, context,
         "Horarios UTM\n\n"
-        "Lunes a viernes 08h00 - 17h00"
+        "Lunes a viernes 08h00 - 17h00",
     )
 
 async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -523,46 +600,61 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
     dato = query.data
 
     if dato in SECCIONES_DB:
-        await enviar_seccion_db(query.message, dato)
+        await enviar_seccion_db(query.message, context, dato)
     elif dato == "costo":
-        await query.message.reply_text(
+        await responder_callback(
+            query, context,
             "Costos UTM\n\n"
             "La UTM es universidad publica y gratuita.\n"
             "La matriculacion no tiene ningun costo.",
-            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION)])
+            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION)]),
         )
     elif dato == "horario":
-        await query.message.reply_text(
+        await responder_callback(
+            query, context,
             "Horarios UTM\n\n"
             "Lunes a viernes 08h00 - 17h00\n"
-            "Telefono: (593 5) 263-2677"
+            "Telefono: (593 5) 263-2677",
         )
     elif dato == "ubicacion":
-        await query.message.reply_text(
+        await responder_callback(
+            query, context,
             "Ubicacion UTM\n\n"
             "Av. Urbina y Che Guevara\n"
             "Portoviejo, Manabi, Ecuador",
-            reply_markup=markup_botones([("Ver en Google Maps", "https://maps.google.com/?q=Universidad+Tecnica+de+Manabi+Portoviejo")])
+            reply_markup=markup_botones([("Ver en Google Maps", "https://maps.google.com/?q=Universidad+Tecnica+de+Manabi+Portoviejo")]),
         )
     elif dato == "contacto":
-        await query.message.reply_text(
+        await responder_callback(
+            query, context,
             texto_contacto(),
-            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)])
+            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)]),
         )
 
 async def bienvenida(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message and update.message.new_chat_members:
-        for user in update.message.new_chat_members:
-            await update.message.reply_text(
-                f"Bienvenido {user.first_name}!\n\n"
-                "Grupo de estudio UTM\n\n"
-                f"Escribe {BOT_USERNAME} seguido de tu pregunta\n"
-                "o usa /start para ver el menu.\n\n"
-                "Reglas:\n"
-                "No spam\n"
-                "No enlaces\n"
-                "Respeto mutuo"
-            )
+    if not update.message or not update.message.new_chat_members:
+        return
+
+    for user in update.message.new_chat_members:
+        if user.is_bot:
+            continue
+
+        es_regreso = usuario_existe(user.id)
+        guardar_usuario(user)
+        saludo = "Bienvenido de nuevo" if es_regreso else "Bienvenido"
+
+        await responder(
+            update.message, context,
+            f"{saludo} {user.first_name}!\n\n"
+            "Grupo de estudio UTM\n\n"
+            f"Escribe {BOT_USERNAME} seguido de tu pregunta\n"
+            "o usa /start para ver el menu.\n\n"
+            "Reglas:\n"
+            "No spam\n"
+            "No enlaces\n"
+            "Respeto mutuo",
+            borrar_origen=True,
+        )
 
 async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -587,16 +679,16 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         chat_id=update.effective_chat.id,
                         user_id=user.id
                     )
-                    await context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text=f"{user.first_name} fue baneado por enviar enlaces."
+                    await enviar_temporal(
+                        update.effective_chat, context,
+                        f"{user.first_name} fue baneado por enviar enlaces.",
                     )
                 except Exception as e:
                     logger.error(f"No se pudo banear: {e}")
             else:
-                await context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=f"Advertencia {adv}/2 para {user.first_name}: No se permiten enlaces."
+                await enviar_temporal(
+                    update.effective_chat, context,
+                    f"Advertencia {adv}/2 para {user.first_name}: No se permiten enlaces.",
                 )
             return
 
@@ -606,53 +698,58 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto_lower = texto.lower()
 
     if any(p in texto_lower for p in ["admis", "inscripci", "ingreso", "postula"]):
-        await enviar_seccion_db(update.message, "admision")
+        await enviar_seccion_db(update.message, context, "admision")
         return
 
     if any(p in texto_lower for p in ["matricula", "matrícula", "materias", "paralelo", "sgu", "sga", "sistema de gestion", "como matricul"]):
-        await enviar_seccion_db(update.message, "matricula")
+        await enviar_seccion_db(update.message, context, "matricula")
         return
 
     if any(p in texto_lower for p in ["carrera", "facultad", "oferta"]):
-        await enviar_seccion_db(update.message, "carreras")
+        await enviar_seccion_db(update.message, context, "carreras")
         return
 
     if any(p in texto_lower for p in ["contacto", "whatsapp", "telefono", "teléfono"]):
-        await update.message.reply_text(
+        await responder(
+            update.message, context,
             texto_contacto(),
-            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)])
+            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)]),
         )
         return
 
     if any(p in texto_lower for p in ["horario", "atencion", "atención"]):
-        await update.message.reply_text(
+        await responder(
+            update.message, context,
             "Horarios UTM\n\n"
             "Lunes a viernes 08h00 - 17h00\n"
-            "Telefono: (593 5) 263-2677"
+            "Telefono: (593 5) 263-2677",
         )
         return
 
     if any(p in texto_lower for p in ["costo", "precio", "gratis", "gratuito", "pagar"]):
-        await update.message.reply_text(
+        await responder(
+            update.message, context,
             "Costos UTM\n\n"
             "La UTM es universidad publica y gratuita.\n"
-            "La matriculacion no tiene ningun costo."
+            "La matriculacion no tiene ningun costo.",
         )
         return
 
     if any(p in texto_lower for p in ["ubicacion", "ubicación", "donde", "dónde", "direccion"]):
-        await update.message.reply_text(
+        await responder(
+            update.message, context,
             "Ubicacion UTM\n\n"
             "Av. Urbina y Che Guevara\n"
             "Portoviejo, Manabi, Ecuador",
-            reply_markup=markup_botones([("Ver en Google Maps", "https://maps.google.com/?q=Universidad+Tecnica+de+Manabi+Portoviejo")])
+            reply_markup=markup_botones([("Ver en Google Maps", "https://maps.google.com/?q=Universidad+Tecnica+de+Manabi+Portoviejo")]),
         )
         return
 
     if any(p in texto_lower for p in ["menu", "menú", "opciones", "ayuda", "help"]):
-        await update.message.reply_text(
+        await responder(
+            update.message, context,
             "Elige una opcion:",
-            reply_markup=menu_principal()
+            reply_markup=menu_principal(),
         )
         return
 
@@ -681,17 +778,19 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
             contents=prompt
         )
         respuesta = response.text or f"No pude generar una respuesta. {AVISO_WEB_UTM}"
-        await update.message.reply_text(
+        await responder(
+            update.message, context,
             respuesta,
-            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)])
+            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)]),
         )
 
     except Exception as e:
         logger.error(f"Error Gemini: {e}")
-        await update.message.reply_text(
+        await responder(
+            update.message, context,
             "No pude procesar tu pregunta.\n"
             f"{AVISO_WEB_UTM}\nContactanos por WhatsApp al 0986616388.",
-            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)])
+            reply_markup=markup_botones([("Postulacion UTM", URL_POSTULACION), ("Ir al SGU", URL_SGU)]),
         )
 
 def iniciar_bd_en_background():
